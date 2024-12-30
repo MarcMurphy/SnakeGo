@@ -20,7 +20,9 @@ type Coordinate struct {
 }
 
 type Game struct {
-	snake []Coordinate
+	snake     []Coordinate
+	input     *Input
+	direction Direction
 }
 
 func NewGame() ebiten.Game {
@@ -31,10 +33,27 @@ func NewGame() ebiten.Game {
 		{startX - 2, startY},
 	}
 	return &Game{
-		snake: snake,
+		snake:     snake,
+		input:     NewInput(),
+		direction: Up,
 	}
 }
+
 func (g *Game) Update() error {
+	dir, keyPressed := g.input.GetNewDirection()
+	if keyPressed {
+		g.direction = dir
+	}
+	var newHead Coordinate
+
+	velocityX, velocityY := g.direction.ToVelocity()
+
+	newHead.X = g.snake[0].X + velocityX
+	newHead.Y = g.snake[0].Y + velocityY
+
+	g.snake = append([]Coordinate{newHead}, g.snake...)
+	g.snake = g.snake[:len(g.snake)-1]
+
 	return nil
 }
 
