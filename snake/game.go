@@ -4,6 +4,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"image/color"
+	"time"
 )
 
 const (
@@ -20,9 +21,12 @@ type Coordinate struct {
 }
 
 type Game struct {
-	snake     []Coordinate
-	input     *Input
-	direction Direction
+	snake      []Coordinate
+	input      *Input
+	direction  Direction
+	nextMove   Direction
+	updateTick time.Duration
+	lastUpdate time.Time
 }
 
 func NewGame() ebiten.Game {
@@ -33,26 +37,54 @@ func NewGame() ebiten.Game {
 		{startX - 2, startY},
 	}
 	return &Game{
-		snake:     snake,
-		input:     NewInput(),
-		direction: Up,
+		snake:      snake,
+		input:      NewInput(),
+		direction:  Up,
+		updateTick: 200 * time.Millisecond,
+		lastUpdate: time.Now(),
+	}
+}
+func (g *Game) changeDirection() {
+	if dir, keyPressed := g.input.GetNewDirection(); keyPressed {
+		dx1, dy1 := g.direction.ToVelocity()
+		dx2, dy2 := dir.ToVelocity()
+		// Only change direction if it's NOT the opposite
+		if !(dx1 == -dx2 && dy1 == -dy2) {
+			g.nextMove = dir
+		}
 	}
 }
 
-func (g *Game) Update() error {
-	dir, keyPressed := g.input.GetNewDirection()
-	if keyPressed {
-		g.direction = dir
-	}
-	var newHead Coordinate
+func wrap(value, max int) int {
+	// This ensures a negative value ends up in 0..max-1
+	return (value%max + max) % max
+}
+
+func (g *Game) moveSnake() {
+	g.direction = g.nextMove
+	head := g.snake[0]
 
 	velocityX, velocityY := g.direction.ToVelocity()
+	newHead := Coordinate{X: head.X + velocityX, Y: head.Y + velocityY}
 
-	newHead.X = g.snake[0].X + velocityX
-	newHead.Y = g.snake[0].Y + velocityY
+	newHead.X = wrap(newHead.X, boardWidth)
+	newHead.Y = wrap(newHead.Y, boardHeight)
 
+	// Insert new head at the front
 	g.snake = append([]Coordinate{newHead}, g.snake...)
+	// Remove the tail
 	g.snake = g.snake[:len(g.snake)-1]
+}
+
+func (g *Game) Update() error {
+	// update direction every frame but only move snake every X frames
+	// as the keyboard input is smoother this way
+	g.changeDirection()
+	if time.Since(g.lastUpdate) < g.updateTick {
+		return nil
+	}
+	g.lastUpdate = time.Now()
+	g.moveSnake()
 
 	return nil
 }
