@@ -56,7 +56,7 @@ func (g *Game) changeDirection() {
 }
 
 func wrap(value, max int) int {
-	// This ensures a negative value ends up in 0..max-1
+	//shorthand version of "if x < 0 then x = boardWidth OR if x > boardWidth then x = 0"
 	return (value%max + max) % max
 }
 
@@ -77,8 +77,7 @@ func (g *Game) moveSnake() {
 }
 
 func (g *Game) Update() error {
-	// update direction every frame but only move snake every X frames
-	// as the keyboard input is smoother this way
+	// update direction every frame but only move snake every X frames, as the keyboard input is smoother this way
 	g.changeDirection()
 	if time.Since(g.lastUpdate) < g.updateTick {
 		return nil
