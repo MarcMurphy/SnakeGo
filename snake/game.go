@@ -1,9 +1,12 @@
 package snake
 
 import (
+	"fmt"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"image/color"
+	"math/rand"
 	"time"
 )
 
@@ -27,6 +30,29 @@ type Game struct {
 	nextMove   Direction
 	updateTick time.Duration
 	lastUpdate time.Time
+	gameOver   bool
+	fruit      Coordinate
+	score      int
+}
+
+func randomFruitPosition(snake []Coordinate) Coordinate {
+	for {
+		x := rand.Intn(boardWidth)
+		y := rand.Intn(boardHeight)
+
+		// Make sure it's not on the snake
+		occupied := false
+		for _, seg := range snake {
+			if seg.X == x && seg.Y == y {
+				occupied = true
+				break
+			}
+		}
+
+		if !occupied {
+			return Coordinate{x, y}
+		}
+	}
 }
 
 func NewGame() ebiten.Game {
@@ -40,7 +66,8 @@ func NewGame() ebiten.Game {
 		snake:      snake,
 		input:      NewInput(),
 		direction:  Up,
-		updateTick: 200 * time.Millisecond,
+		fruit:      randomFruitPosition(snake),
+		updateTick: 50 * time.Millisecond,
 		lastUpdate: time.Now(),
 	}
 }
@@ -70,13 +97,29 @@ func (g *Game) moveSnake() {
 	newHead.X = wrap(newHead.X, boardWidth)
 	newHead.Y = wrap(newHead.Y, boardHeight)
 
+	for _, seg := range g.snake {
+		if seg.X == newHead.X && seg.Y == newHead.Y {
+			g.gameOver = true
+			return
+		}
+	}
+
 	// Insert new head at the front
 	g.snake = append([]Coordinate{newHead}, g.snake...)
-	// Remove the tail
-	g.snake = g.snake[:len(g.snake)-1]
+	if newHead == g.fruit {
+		g.score++
+		g.fruit = randomFruitPosition(g.snake)
+	} else {
+		// Remove the tail if we have not eaten a fruit
+		g.snake = g.snake[:len(g.snake)-1]
+	}
+
 }
 
 func (g *Game) Update() error {
+	if g.gameOver {
+		return nil
+	}
 	// update direction every frame but only move snake every X frames, as the keyboard input is smoother this way
 	g.changeDirection()
 	if time.Since(g.lastUpdate) < g.updateTick {
@@ -102,6 +145,21 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			false,
 		)
 	}
+
+	vector.DrawFilledRect(
+		screen,
+		float32(g.fruit.X*tileSize),
+		float32(g.fruit.Y*tileSize),
+		tileSize,
+		tileSize,
+		color.RGBA{0, 255, 255, 255},
+		false,
+	)
+
+	ebitenutil.DebugPrint(
+		screen,
+		fmt.Sprintf("Score: %d", g.score),
+	)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
